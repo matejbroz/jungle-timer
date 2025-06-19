@@ -1,24 +1,25 @@
 import streamlit as st
 import time
+import os
 
 # Set up page
 st.set_page_config(page_title="LoL Jungle Timer", layout="wide")
 st.title("🕒 LoL Jungle Timer")
 
-# Define camps for each side
+# Define camps for each side, with optional image paths
 left_camps = {
     "Blue Buff": {"time": 300, "img": "images/blue_buff.png"},
-    "Gromp": {"time": 135, "img": "images/gromp.png"},
-    "Wolves": {"time": 135, "img": "images/wolves.png"},
-    "Raptors": {"time": 135, "img": "images/raptors.png"},
-    "Krugs": {"time": 135, "img": "images/krugs.png"},
+    "Gromp":     {"time": 135, "img": "images/gromp.png"},
+    "Wolves":    {"time": 135, "img": "images/wolves.png"},
+    "Raptors":   {"time": 135, "img": "images/raptors.png"},
+    "Krugs":     {"time": 135, "img": "images/krugs.png"},
 }
 right_camps = {
-    "Red Buff": {"time": 300, "img": "images/red_buff.png"},
-    "Krugs": {"time": 135, "img": "images/krugs.png"},
-    "Wolves": {"time": 135, "img": "images/wolves.png"},
-    "Raptors": {"time": 135, "img": "images/raptors.png"},
-    "Gromp": {"time": 135, "img": "images/gromp.png"},
+    "Red Buff":  {"time": 300, "img": "images/red_buff.png"},
+    "Krugs":     {"time": 135, "img": "images/krugs.png"},
+    "Wolves":    {"time": 135, "img": "images/wolves.png"},
+    "Raptors":   {"time": 135, "img": "images/raptors.png"},
+    "Gromp":     {"time": 135, "img": "images/gromp.png"},
 }
 
 # Initialize session state
@@ -54,22 +55,35 @@ def handle_press(camp, duration):
             ctime.pop(camp, None)
 
 # Display camps in pairs
-for left, right in zip(left_camps.items(), right_camps.items()):
-    camp_left, data_left = left
-    camp_right, data_right = right
+for (camp_left, data_left), (camp_right, data_right) in zip(left_camps.items(), right_camps.items()):
     col1, col2 = st.columns(2)
 
-    for camp, data, col, side in [
-        (camp_left, data_left, col1, "L"),
-        (camp_right, data_right, col2, "R")
-    ]:
-        with col:
-            st.image(data["img"], width=80)
-            end = st.session_state["timers"].get(camp, 0)
-            rem = int(end - time.time()) if end else -1
-            status = "READY" if rem <= 0 else f"{rem//60}:{rem%60:02d}"
-            st.markdown(f"**{camp}**: {status}")
-            btn = "Start" if camp not in st.session_state["timers"] else (
-                  "Cancel?" if st.session_state["confirm"].get(camp, False) else "Start")
-            if st.button(btn, key=f"{side}_{camp}"):
-                handle_press(camp, data["time"])
+    # Left side
+    with col1:
+        if os.path.exists(data_left["img"]):
+            st.image(data_left["img"], width=80)
+        else:
+            st.markdown(f"**{camp_left}**")
+        end = st.session_state["timers"].get(camp_left, 0)
+        rem = int(end - time.time()) if end else -1
+        status = "READY" if rem <= 0 else f"{rem//60}:{rem%60:02d}"
+        st.markdown(f"{status}")
+        btn = "Start" if camp_left not in st.session_state["timers"] else (
+              "Cancel?" if st.session_state["confirm"].get(camp_left, False) else "Start")
+        if st.button(btn, key=f"L_{camp_left}"):
+            handle_press(camp_left, data_left["time"])
+
+    # Right side
+    with col2:
+        if os.path.exists(data_right["img"]):
+            st.image(data_right["img"], width=80)
+        else:
+            st.markdown(f"**{camp_right}**")
+        end = st.session_state["timers"].get(camp_right, 0)
+        rem = int(end - time.time()) if end else -1
+        status = "READY" if rem <= 0 else f"{rem//60}:{rem%60:02d}"
+        st.markdown(f"{status}")
+        btn = "Start" if camp_right not in st.session_state["timers"] else (
+              "Cancel?" if st.session_state["confirm"].get(camp_right, False) else "Start")
+        if st.button(btn, key=f"R_{camp_right}"):
+            handle_press(camp_right, data_right["time"])
