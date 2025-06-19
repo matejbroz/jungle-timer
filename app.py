@@ -2,43 +2,74 @@ import streamlit as st
 import time
 
 # Set up page
-st.set_page_config(page_title="LoL Jungle Timer", layout="centered")
+st.set_page_config(page_title="LoL Jungle Timer", layout="wide")
 st.title("🕒 LoL Jungle Timer")
 
-# Jungle camps with respawn times (seconds)
-jungle_camps = {
-    "Blue Buff": 300,
-    "Red Buff": 300,
-    "Gromp": 135,
-    "Wolves": 135,
-    "Raptors": 135,
-    "Krugs": 135,
-    "Scuttle": 150,
-    "Dragon": 300,
-    "Herald": 360,
-    "Baron": 360
+# Define camps for each side
+left_camps = {
+    "Blue Buff": {"time": 300, "img": "images/blue_buff.png"},
+    "Gromp": {"time": 135, "img": "images/gromp.png"},
+    "Wolves": {"time": 135, "img": "images/wolves.png"},
+    "Raptors": {"time": 135, "img": "images/raptors.png"},
+    "Krugs": {"time": 135, "img": "images/krugs.png"},
+}
+right_camps = {
+    "Red Buff": {"time": 300, "img": "images/red_buff.png"},
+    "Krugs": {"time": 135, "img": "images/krugs.png"},
+    "Wolves": {"time": 135, "img": "images/wolves.png"},
+    "Raptors": {"time": 135, "img": "images/raptors.png"},
+    "Gromp": {"time": 135, "img": "images/gromp.png"},
 }
 
 # Initialize session state
-if "timers" not in st.session_state:
-    st.session_state.timers = {}
+for key in ("timers", "confirm", "confirm_time"):
+    if key not in st.session_state:
+        st.session_state[key] = {}
 
-# Display timers
-for camp, respawn_time in jungle_camps.items():
-    col1, col2 = st.columns([3, 1])
+# Auto-clear confirm prompts after 3 seconds
+for camp, ts in list(st.session_state["confirm_time"].items()):
+    if time.time() - ts > 3:
+        st.session_state["confirm"].pop(camp, None)
+        st.session_state["confirm_time"].pop(camp, None)
 
-    with col1:
-        if camp in st.session_state.timers:
-            remaining = int(st.session_state.timers[camp] - time.time())
-            if remaining <= 0:
-                st.markdown(f"**{camp}**: READY")
-            else:
-                mins = remaining // 60
-                secs = remaining % 60
-                st.markdown(f"**{camp}**: {mins}:{secs:02d}")
+def handle_press(camp, duration):
+    """Start timer, or toggle/cancel based on confirm state."""
+    timers = st.session_state["timers"]
+    confirm = st.session_state["confirm"]
+    ctime = st.session_state["confirm_time"]
+
+    if camp not in timers:
+        # Start timer
+        timers[camp] = time.time() + duration
+        confirm.pop(camp, None)
+        ctime.pop(camp, None)
+    else:
+        # Already running: either ask to cancel or actually cancel
+        if not confirm.get(camp, False):
+            confirm[camp] = True
+            ctime[camp] = time.time()
         else:
-            st.markdown(f"**{camp}**: READY")
+            timers.pop(camp, None)
+            confirm.pop(camp, None)
+            ctime.pop(camp, None)
 
-    with col2:
-        if st.button(f"Start", key=camp):
-            st.session_state.timers[camp] = time.time() + respawn_time
+# Display camps in pairs
+for left, right in zip(left_camps.items(), right_camps.items()):
+    camp_left, data_left = left
+    camp_right, data_right = right
+    col1, col2 = st.columns(2)
+
+    for camp, data, col, side in [
+        (camp_left, data_left, col1, "L"),
+        (camp_right, data_right, col2, "R")
+    ]:
+        with col:
+            st.image(data["img"], width=80)
+            end = st.session_state["timers"].get(camp, 0)
+            rem = int(end - time.time()) if end else -1
+            status = "READY" if rem <= 0 else f"{rem//60}:{rem%60:02d}"
+            st.markdown(f"**{camp}**: {status}")
+            btn = "Start" if camp not in st.session_state["timers"] else (
+                  "Cancel?" if st.session_state["confirm"].get(camp, False) else "Start")
+            if st.button(btn, key=f"{side}_{camp}"):
+                handle_press(camp, data["time"])
