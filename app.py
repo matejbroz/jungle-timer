@@ -4,7 +4,7 @@ import os
 from streamlit_autorefresh import st_autorefresh
 
 # ─── 1) AUTO-REFRESH ───────────────────────────────────────────────────────────
-# rerun the script every 1000 ms so our timers update live
+# rerun the script every 1000 ms so timers update in real time
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
 
 # ─── 2) PAGE SETUP ─────────────────────────────────────────────────────────────
@@ -28,67 +28,77 @@ right_camps = {
 }
 
 # ─── 4) SESSION STATE SETUP ────────────────────────────────────────────────────
-for key in ("timers", "confirm", "confirm_time"):
+for key in ("timers", "confirm", "confirm_time"):  
     if key not in st.session_state:
         st.session_state[key] = {}
 
-# Clear “Cancel?” prompts older than 3 s
-for camp, ts in list(st.session_state["confirm_time"].items()):
+# clear old confirm prompts older than 3 seconds
+for key, ts in list(st.session_state["confirm_time"].items()):
     if time.time() - ts > 3:
-        st.session_state["confirm"].pop(camp, None)
-        st.session_state["confirm_time"].pop(camp, None)
+        st.session_state["confirm"].pop(key, None)
+        st.session_state["confirm_time"].pop(key, None)
 
 # ─── 5) HANDLER ────────────────────────────────────────────────────────────────
-def handle_press(camp, duration):
+def handle_press(identifier, duration):
+    """Start timer, or toggle/cancel based on confirm state."""
     timers  = st.session_state["timers"]
     confirm = st.session_state["confirm"]
     ctime   = st.session_state["confirm_time"]
 
-    if camp not in timers:
+    if identifier not in timers:
         # start fresh
-        timers[camp] = time.time() + duration
-        confirm.pop(camp, None)
-        ctime.pop(camp, None)
+        timers[identifier] = time.time() + duration
+        confirm.pop(identifier, None)
+        ctime.pop(identifier, None)
     else:
-        # already running → toggle/cancel
-        if not confirm.get(camp, False):
-            confirm[camp] = True
-            ctime[camp]  = time.time()
+        # already running -> ask to cancel or cancel
+        if not confirm.get(identifier, False):
+            confirm[identifier] = True
+            ctime[identifier]  = time.time()
         else:
-            timers.pop(camp, None)
-            confirm.pop(camp, None)
-            ctime.pop(camp, None)
+            timers.pop(identifier, None)
+            confirm.pop(identifier, None)
+            ctime.pop(identifier, None)
 
-# ─── 6) RENDER PAIRWISE ────────────────────────────────────────────────────────
+# ─── 6) RENDER SIDE-BY-SIDE ────────────────────────────────────────────────────
 for (campL, dataL), (campR, dataR) in zip(left_camps.items(), right_camps.items()):
     col1, col2 = st.columns(2)
 
-    # LEFT
+    # Left side
     with col1:
-        if os.path.exists(dataL["img"]):
-            st.image(dataL["img"], width=80)
+        identL = f"L_{campL.replace(' ', '_')}"
+        # image or text fallback
+        if os.path.exists(dataL['img']):
+            st.image(dataL['img'], width=80)
         else:
             st.markdown(f"**{campL}**")
-        end = st.session_state["timers"].get(campL, 0)
-        rem = max(0, int(end - time.time()))
+        # timer display
+        end_ts = st.session_state['timers'].get(identL, 0)
+        rem = max(0, int(end_ts - time.time()))
         status = "READY" if rem == 0 else f"{rem//60}:{rem%60:02d}"
         st.markdown(status)
-        btn = ("Start" if campL not in st.session_state["timers"]
-               else ("Cancel?" if st.session_state["confirm"].get(campL) else "Start"))
-        if st.button(btn, key=f"L_{campL}"):
-            handle_press(campL, dataL["time"])
+        # button logic
+        btn_label = (
+            "Start" if identL not in st.session_state['timers']
+            else ("Cancel?" if st.session_state['confirm'].get(identL) else "Start")
+        )
+        if st.button(btn_label, key=identL):
+            handle_press(identL, dataL['time'])
 
-    # RIGHT
+    # Right side
     with col2:
-        if os.path.exists(dataR["img"]):
-            st.image(dataR["img"], width=80)
+        identR = f"R_{campR.replace(' ', '_')}"
+        if os.path.exists(dataR['img']):
+            st.image(dataR['img'], width=80)
         else:
             st.markdown(f"**{campR}**")
-        end = st.session_state["timers"].get(campR, 0)
-        rem = max(0, int(end - time.time()))
+        end_ts = st.session_state['timers'].get(identR, 0)
+        rem = max(0, int(end_ts - time.time()))
         status = "READY" if rem == 0 else f"{rem//60}:{rem%60:02d}"
         st.markdown(status)
-        btn = ("Start" if campR not in st.session_state["timers"]
-               else ("Cancel?" if st.session_state["confirm"].get(campR) else "Start"))
-        if st.button(btn, key=f"R_{campR}"):
-            handle_press(campR, dataR["time"])
+        btn_label = (
+            "Start" if identR not in st.session_state['timers']
+            else ("Cancel?" if st.session_state['confirm'].get(identR) else "Start")
+        )
+        if st.button(btn_label, key=identR):
+            handle_press(identR, dataR['time'])
